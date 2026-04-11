@@ -1,0 +1,169 @@
+name: Scrape
+
+on:
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: "Specific account id to run (leave empty to run all due now)"
+        required: false
+        default: ""
+      force:
+        description: "Force run even if not scheduled this hour"
+        required: false
+        default: "false"
+  schedule:
+    # Every hour at :05 — workflow filters which accounts are due
+    - cron: "5 * * * *"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      count: ${{ steps.build.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build matrix of accounts to run
+        id: build
+        env:
+          INPUT_ACCOUNT: ${{ github.event.inputs.account_id }}
+          INPUT_FORCE: ${{ github.event.inputs.force }}
+        run: |
+          CUR_HOUR=$(TZ='Asia/Jerusalem' date +%-H)
+          DOW=$(TZ='Asia/Jerusalem' date +%u)
+          DOM=$(TZ='Asia/Jerusalem' date +%-d)
+          echo "Israel hour=$CUR_HOUR dow=$DOW dom=$DOM"
+          MATRIX=$(jq -c --arg h "$CUR_HOUR" --arg dow "$DOW" --arg dom "$DOM" \
+            --arg only "$INPUT_ACCOUNT" --arg force "$INPUT_FORCE" '
+            [ .accounts[]
+              | select(.enabled != false)
+              | select(($only == "" and (
+                  $force == "true"
+                  or ((.hours | index(($h|tonumber)))
+                    and (
+                      .frequency == "daily"
+                      or (.frequency == "weekly" and ((.dayOfWeek // 1)|tostring) == $dow)
+                      or (.frequency == "monthly" and ((.dayOfMonth // 1)|tostring) == $dom)
+                    ))
+                )) or ($only != "" and .id == $only))
+              | { id, label, companyId, email, daysBack, userSecret, passSecret }
+            ]' accounts.json)
+          COUNT=$(echo "$MATRIX" | jq 'length')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Selected $COUNT accounts: $MATRIX"
+
+  scrape:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        account: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Resolve credentials from secrets
+        id: creds
+        env:
+          USER_SECRET_NAME: ${{ matrix.account.userSecret }}
+          PASS_SECRET_NAME: ${{ matrix.account.passSecret }}
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          BANK_USER=$(echo "$ALL_SECRETS" | jq -r --arg k "$USER_SECRET_NAME" '.[$k] // ""')
+          BANK_PASS=$(echo "$ALL_SECRETS" | jq -r --arg k "$PASS_SECRET_NAME" '.[$k] // ""')
+          if [ -z "$BANK_USER" ] || [ -z "$BANK_PASS" ]; then
+            echo "::error::Missing credentials for ${{ matrix.account.id }} ($USER_SECRET_NAME / $PASS_SECRET_NAME)"
+            exit 1
+          fi
+          echo "::add-mask::$BANK_USER"
+          echo "::add-mask::$BANK_PASS"
+          echo "user=$BANK_USER" >> $GITHUB_OUTPUT
+          echo "pass=$BANK_PASS" >> $GITHUB_OUTPUT
+
+      - name: Pull moneyman image
+        run: docker pull ghcr.io/daniel-hauser/moneyman:latest
+
+      - name: Prepare output directory
+        run: mkdir -p ${{ github.workspace }}/output && chmod 777 ${{ github.workspace }}/output
+
+      - name: Build MONEYMAN_CONFIG
+        env:
+          ACCT_COMPANY: ${{ matrix.account.companyId }}
+          ACCT_DAYS: ${{ matrix.account.daysBack }}
+          BANK_USER: ${{ steps.creds.outputs.user }}
+          BANK_PASS: ${{ steps.creds.outputs.pass }}
+        run: |
+          CONFIG=$(jq -nc \
+            --arg company "$ACCT_COMPANY" \
+            --arg user "$BANK_USER" \
+            --arg pass "$BANK_PASS" \
+            --argjson days "${ACCT_DAYS:-30}" \
+            '{
+               accounts: [{ companyId: $company, username: $user, password: $pass }],
+               storage: { localJson: { enabled: true, path: "/output" } },
+               options: { scraping: { daysBack: $days, futureMonths: 1, transactionHashType: "moneyman" }, scraperMaxParallelism: 1 }
+             }')
+          echo "::add-mask::$CONFIG"
+          echo "$CONFIG" > "$RUNNER_TEMP/moneyman.cfg.json"
+
+      - name: Run moneyman scraper
+        env:
+          DEBUG: "moneyman:*"
+          TZ: "Asia/Jerusalem"
+          MONEYMAN_UNSAFE_STDOUT: "true"
+        run: |
+          MONEYMAN_CONFIG_VAL=$(cat "$RUNNER_TEMP/moneyman.cfg.json")
+          docker run --rm \
+            -v ${{ github.workspace }}/output:/output \
+            -e MONEYMAN_CONFIG="$MONEYMAN_CONFIG_VAL" \
+            -e DEBUG \
+            -e TZ \
+            -e MONEYMAN_UNSAFE_STDOUT \
+            ghcr.io/daniel-hauser/moneyman:latest
+
+      - name: Build email HTML
+        id: buildmail
+        if: always()
+        env:
+          ACCT_LABEL: ${{ matrix.account.label }}
+          ACCT_DAYS: ${{ matrix.account.daysBack }}
+        run: |
+          LATEST=$(ls -t ${{ github.workspace }}/output/*.json 2>/dev/null | head -n1 || echo "")
+          if [ -z "$LATEST" ]; then
+            echo "tx_count=0" >> $GITHUB_OUTPUT
+            echo "<p>אין תנועות חדשות.</p>" > email.html
+            exit 0
+          fi
+          COUNT=$(jq 'length' "$LATEST")
+          echo "tx_count=$COUNT" >> $GITHUB_OUTPUT
+          {
+            echo '<div dir="rtl" style="font-family:Arial,sans-serif;">'
+            echo "<h3>$ACCT_LABEL</h3>"
+            echo "<p>סה״כ $COUNT תנועות (${ACCT_DAYS} ימים אחרונים)</p>"
+            echo '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;"><thead><tr style="background:#eee;"><th>תאריך</th><th>תיאור</th><th>סכום</th><th>סטטוס</th></tr></thead><tbody>'
+            jq -r 'sort_by(.date)[] | [(.uniqueId | split("_")[0] | split("-") | "\(.[2])/\(.[1])/\(.[0])"), .description, .chargedAmount, .status] | "<tr><td>\(.[0])</td><td>\(.[1])</td><td style=\"color:\(if .[2] < 0 then "#c33" else "#393" end);font-weight:bold;text-align:left;\">\(if .[2] > 0 then "+" else "" end)\(.[2]) ₪</td><td>\(if .[3] == "pending" then "ממתינה" else "בוצעה" end)</td></tr>"' "$LATEST"
+            echo '</tbody></table></div>'
+          } > email.html
+
+      - name: Send email
+        if: always() && steps.buildmail.outputs.tx_count != '0'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "${{ matrix.account.label }} - ${{ steps.buildmail.outputs.tx_count }} תנועות"
+          to: ${{ matrix.account.email }}
+          from: moneyman scraper <${{ secrets.MAIL_USERNAME }}>
+          html_body: file://email.html
+          convert_markdown: false
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transactions-${{ matrix.account.id }}
+          path: ${{ github.workspace }}/output/
+          if-no-files-found: warn
