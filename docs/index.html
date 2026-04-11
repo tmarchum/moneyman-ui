@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moneyman UI - ניהול חשבונות בנק</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.13/dist/browsers/sodium.js"></script>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>💰 Moneyman UI</h1>
+    <p class="muted">ניהול חשבונות בנק לסקרייפינג ומיילים אוטומטיים</p>
+  </header>
+
+  <section id="auth-section" class="card">
+    <h2>הגדרות גישה ל-GitHub</h2>
+    <p class="muted">ה-PAT נשמר רק בדפדפן שלך (localStorage). אינו נשלח לשום שרת חוץ מ-GitHub API.</p>
+    <label>Owner: <input id="owner" type="text" value="tmarchum"></label>
+    <label>Repo: <input id="repo" type="text" value="moneyman-ui"></label>
+    <label>GitHub PAT: <input id="pat" type="password" placeholder="ghp_..."></label>
+    <button id="save-auth">שמור</button>
+    <span id="auth-status" class="status"></span>
+  </section>
+
+  <section id="mail-section" class="card">
+    <h2>הגדרות מייל (SMTP)</h2>
+    <p class="muted">נשמרים כסודות ב-GitHub Secrets, מוצפנים בדפדפן לפני השליחה.</p>
+    <label>Gmail address: <input id="mail-user" type="email" placeholder="you@gmail.com"></label>
+    <label>App Password: <input id="mail-pass" type="password" placeholder="xxxx xxxx xxxx xxxx"></label>
+    <button id="save-mail">שמור סודות מייל</button>
+    <span id="mail-status" class="status"></span>
+  </section>
+
+  <section id="accounts-section" class="card">
+    <h2>חשבונות בנק</h2>
+    <button id="refresh-accounts">רענן רשימה</button>
+    <div id="accounts-list"></div>
+  </section>
+
+  <section id="add-account-section" class="card">
+    <h2>הוסף חשבון חדש</h2>
+    <label>מזהה (אנגלית, ייחודי): <input id="acc-id" type="text" placeholder="leumi-123456"></label>
+    <label>תווית (לתצוגה): <input id="acc-label" type="text" placeholder="לאומי 123456"></label>
+    <label>בנק:
+      <select id="acc-company">
+        <option value="hapoalim">בנק הפועלים</option>
+        <option value="leumi">בנק לאומי</option>
+        <option value="discount">בנק דיסקונט</option>
+        <option value="mercantile">מרכנתיל</option>
+        <option value="mizrahi">מזרחי טפחות</option>
+        <option value="otsarHahayal">אוצר החייל</option>
+        <option value="union">הבנק הבינלאומי</option>
+        <option value="pagi">פאג״י (בינלאומי)</option>
+        <option value="beinleumi">בינלאומי</option>
+        <option value="massad">מסד</option>
+        <option value="yahav">יהב</option>
+        <option value="visaCal">ויזה כאל</option>
+        <option value="max">מקס (לשעבר לאומי קארד)</option>
+        <option value="isracard">ישראכרט</option>
+        <option value="amex">אמריקן אקספרס</option>
+        <option value="behatsdaa">בהצדעה</option>
+        <option value="oneZero">וואן זירו</option>
+      </select>
+    </label>
+    <label>שם משתמש בבנק: <input id="acc-user" type="text"></label>
+    <label>סיסמה בבנק: <input id="acc-pass" type="password"></label>
+    <label>מייל יעד: <input id="acc-email" type="email"></label>
+    <label>שעות שליחה (Israel time, מופרדות בפסיק): <input id="acc-hours" type="text" value="13,1" placeholder="13,1"></label>
+    <label>תדירות:
+      <select id="acc-frequency">
+        <option value="daily">יומי</option>
+        <option value="weekly">שבועי</option>
+        <option value="monthly">חודשי</option>
+      </select>
+    </label>
+    <label>ימים אחורה: <input id="acc-days" type="number" value="30" min="1" max="365"></label>
+    <button id="add-account">הוסף חשבון</button>
+    <span id="add-status" class="status"></span>
+  </section>
+
+  <section id="runs-section" class="card">
+    <h2>הרצות אחרונות</h2>
+    <button id="refresh-runs">רענן</button>
+    <div id="runs-list"></div>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
