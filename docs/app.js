@@ -1,25 +1,14 @@
 // Moneyman UI - GitHub-backed multi-account scraper manager
 
+import _sodiumModule from 'https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.15/+esm';
+
 const LS_KEY = 'moneyman-ui-auth';
 let sodium = null;
 
-function sodium_ready() {
-  return new Promise(resolve => {
-    const check = () => {
-      if (window._sodium) {
-        window._sodium.ready.then(() => {
-          sodium = window._sodium;
-          resolve();
-        });
-      } else if (window.sodium && window.sodium.crypto_box_seal) {
-        sodium = window.sodium;
-        resolve();
-      } else {
-        setTimeout(check, 100);
-      }
-    };
-    check();
-  });
+async function sodium_ready() {
+  if (sodium) return;
+  await _sodiumModule.ready;
+  sodium = _sodiumModule;
 }
 sodium_ready();
 
