@@ -117,7 +117,8 @@ document.getElementById('save-mail').onclick = async () => {
 async function readAccountsFile() {
   const a = getAuth();
   const r = await gh('GET', `/repos/${a.owner}/${a.repo}/contents/accounts.json`);
-  const content = atob(r.content.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(atob(r.content.replace(/\n/g, '')), c => c.charCodeAt(0));
+  const content = new TextDecoder('utf-8').decode(bytes);
   return { sha: r.sha, data: JSON.parse(content) };
 }
 
