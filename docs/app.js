@@ -156,6 +156,7 @@ async function refreshAccounts() {
         </div>
         <div class="actions">
           <button data-id="${escapeHtml(acc.id)}" class="run-now">הרץ עכשיו</button>
+          <button data-id="${escapeHtml(acc.id)}" class="edit-acc secondary">ערוך</button>
           <button data-id="${escapeHtml(acc.id)}" class="toggle secondary">${acc.enabled === false ? 'הפעל' : 'השבת'}</button>
           <button data-id="${escapeHtml(acc.id)}" class="delete danger">מחק</button>
         </div>
@@ -163,6 +164,7 @@ async function refreshAccounts() {
       list.appendChild(row);
     });
     list.querySelectorAll('.run-now').forEach(b => b.onclick = () => runAccount(b.dataset.id));
+    list.querySelectorAll('.edit-acc').forEach(b => b.onclick = () => editAccount(b.dataset.id));
     list.querySelectorAll('.toggle').forEach(b => b.onclick = () => toggleAccount(b.dataset.id));
     list.querySelectorAll('.delete').forEach(b => b.onclick = () => deleteAccount(b.dataset.id));
   } catch (e) {
@@ -195,6 +197,57 @@ async function toggleAccount(id) {
   refreshAccounts();
 }
 
+async function editAccount(id) {
+  const { data } = await readAccountsFile();
+  const acc = data.accounts.find(x => x.id === id);
+  if (!acc) return;
+  // Fill the form with existing values
+  document.getElementById('acc-id').value = acc.id;
+  document.getElementById('acc-label').value = acc.label;
+  document.getElementById('acc-company').value = acc.companyId;
+  document.getElementById('acc-email').value = acc.email;
+  document.getElementById('acc-hours').value = (acc.hours || []).join(',');
+  document.getElementById('acc-frequency').value = acc.frequency || 'daily';
+  document.getElementById('acc-days').value = acc.daysBack || 30;
+  document.getElementById('acc-user').value = '';
+  document.getElementById('acc-pass').value = '';
+  // Mark form as edit mode
+  document.getElementById('acc-id').dataset.editMode = id;
+  document.getElementById('acc-id').readOnly = true;
+  document.getElementById('add-account').textContent = 'עדכן חשבון';
+  // Show cancel button
+  let cancelBtn = document.getElementById('cancel-edit');
+  if (!cancelBtn) {
+    cancelBtn = document.createElement('button');
+    cancelBtn.id = 'cancel-edit';
+    cancelBtn.className = 'secondary';
+    cancelBtn.textContent = 'בטל עריכה';
+    cancelBtn.style.marginRight = '8px';
+    document.getElementById('add-account').parentNode.insertBefore(cancelBtn, document.getElementById('add-account'));
+  }
+  cancelBtn.style.display = '';
+  cancelBtn.onclick = () => {
+    clearEditMode();
+    refreshAccounts();
+  };
+  // Scroll to form
+  document.getElementById('add-account-section').scrollIntoView({ behavior: 'smooth' });
+  setStatus('add-status', `עורך: ${acc.label}. השאר שם משתמש וסיסמה ריקים אם לא רוצה לשנות אותם.`, true);
+}
+
+function clearEditMode() {
+  document.getElementById('acc-id').dataset.editMode = '';
+  document.getElementById('acc-id').readOnly = false;
+  document.getElementById('add-account').textContent = 'הוסף חשבון';
+  ['acc-id','acc-label','acc-user','acc-pass','acc-email'].forEach(k => document.getElementById(k).value = '');
+  document.getElementById('acc-hours').value = '13,1';
+  document.getElementById('acc-frequency').value = 'daily';
+  document.getElementById('acc-days').value = '30';
+  const cancelBtn = document.getElementById('cancel-edit');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  setStatus('add-status', '', true);
+}
+
 async function deleteAccount(id) {
   if (!confirm(`למחוק חשבון ${id}?`)) return;
   const { data, sha } = await readAccountsFile();
@@ -204,6 +257,7 @@ async function deleteAccount(id) {
 }
 
 document.getElementById('add-account').onclick = async () => {
+  const editMode = document.getElementById('acc-id').dataset.editMode;
   const id = document.getElementById('acc-id').value.trim();
   const label = document.getElementById('acc-label').value.trim();
   const companyId = document.getElementById('acc-company').value;
@@ -214,33 +268,53 @@ document.getElementById('add-account').onclick = async () => {
   const frequency = document.getElementById('acc-frequency').value;
   const daysBack = parseInt(document.getElementById('acc-days').value) || 30;
 
-  if (!id || !label || !user || !pass || !email || hours.length === 0) {
+  if (!id || !label || !email || hours.length === 0) {
     return setStatus('add-status', 'חסרים שדות', false);
+  }
+  if (!editMode && (!user || !pass)) {
+    return setStatus('add-status', 'חסרים שם משתמש וסיסמה', false);
   }
   if (!/^[a-z0-9-]+$/.test(id)) {
     return setStatus('add-status', 'מזהה: רק אותיות אנגלית קטנות, ספרות ומקפים', false);
   }
 
-  setStatus('add-status', 'מעלה...', true);
+  setStatus('add-status', editMode ? 'מעדכן...' : 'מעלה...', true);
   try {
     const upper = id.toUpperCase().replace(/-/g, '_');
     const userSecret = `BANK_USER_${upper}`;
     const passSecret = `BANK_PASS_${upper}`;
-    await setSecret(userSecret, user);
-    await setSecret(passSecret, pass);
+
+    // Update secrets only if provided
+    if (user) await setSecret(userSecret, user);
+    if (pass) await setSecret(passSecret, pass);
 
     const { data, sha } = await readAccountsFile();
-    if (data.accounts.find(x => x.id === id)) {
-      return setStatus('add-status', `מזהה ${id} כבר קיים`, false);
-    }
-    data.accounts.push({
-      id, label, companyId, email, hours, frequency, daysBack,
-      userSecret, passSecret, enabled: true,
-    });
-    await writeAccountsFile(data, sha, `Add account ${id}`);
 
-    setStatus('add-status', `✓ חשבון ${label} נוסף`, true);
-    ['acc-id','acc-label','acc-user','acc-pass','acc-email'].forEach(k => document.getElementById(k).value = '');
+    if (editMode) {
+      // Update existing account
+      const idx = data.accounts.findIndex(x => x.id === id);
+      if (idx === -1) return setStatus('add-status', `חשבון ${id} לא נמצא`, false);
+      data.accounts[idx] = {
+        ...data.accounts[idx],
+        label, companyId, email, hours, frequency, daysBack,
+        userSecret, passSecret,
+      };
+      await writeAccountsFile(data, sha, `Update account ${id}`);
+      setStatus('add-status', `✓ חשבון ${label} עודכן`, true);
+      clearEditMode();
+    } else {
+      // Add new account
+      if (data.accounts.find(x => x.id === id)) {
+        return setStatus('add-status', `מזהה ${id} כבר קיים`, false);
+      }
+      data.accounts.push({
+        id, label, companyId, email, hours, frequency, daysBack,
+        userSecret, passSecret, enabled: true,
+      });
+      await writeAccountsFile(data, sha, `Add account ${id}`);
+      setStatus('add-status', `✓ חשבון ${label} נוסף`, true);
+      ['acc-id','acc-label','acc-user','acc-pass','acc-email'].forEach(k => document.getElementById(k).value = '');
+    }
     refreshAccounts();
   } catch (e) {
     setStatus('add-status', `✗ ${e.message}`, false);
