@@ -145,16 +145,32 @@ async function refreshAccounts() {
     data.accounts.forEach(acc => {
       const row = document.createElement('div');
       row.className = 'account-row';
+      const bankNames = {hapoalim:'בנק הפועלים',leumi:'בנק לאומי',discount:'בנק דיסקונט',mercantile:'מרכנתיל',mizrahi:'מזרחי טפחות',otsarHahayal:'אוצר החייל',union:'הבנק הבינלאומי',pagi:'פאג״י (בינלאומי)',beinleumi:'בינלאומי',massad:'מסד',yahav:'יהב',visaCal:'ויזה כאל',max:'מקס',isracard:'ישראכרט',amex:'אמריקן אקספרס',behatsdaa:'בהצדעה',oneZero:'וואן זירו'};
+      const freqNames = {daily:'יומי',weekly:'שבועי',monthly:'חודשי'};
+      const bankDisplay = bankNames[acc.companyId] || acc.companyId;
+      const freqDisplay = freqNames[acc.frequency] || acc.frequency;
+      const hoursDisplay = (acc.hours || []).map(h => String(h).padStart(2,'0') + ':00').join(', ');
       row.innerHTML = `
         <div class="info">
-          <div class="label">${escapeHtml(acc.label)} ${acc.enabled === false ? '(מושבת)' : ''}</div>
+          <div class="label">${escapeHtml(acc.label)} ${acc.enabled === false ? '<span class="disabled-tag">מושבת</span>' : '<span class="enabled-tag">פעיל</span>'}</div>
           <div class="meta">
-            ${escapeHtml(acc.companyId)} · ${escapeHtml(acc.email)} ·
-            שעות: ${(acc.hours || []).join(',')} · ${escapeHtml(acc.frequency)} ·
-            ${acc.daysBack || 30} ימים אחורה
+            ${escapeHtml(bankDisplay)} · ${escapeHtml(acc.email)}
+          </div>
+          <div class="details" id="details-${escapeHtml(acc.id)}" style="display:none;">
+            <table class="detail-table">
+              <tr><td class="dt-label">מזהה:</td><td>${escapeHtml(acc.id)}</td></tr>
+              <tr><td class="dt-label">בנק:</td><td>${escapeHtml(bankDisplay)}</td></tr>
+              <tr><td class="dt-label">מייל יעד:</td><td>${escapeHtml(acc.email)}</td></tr>
+              <tr><td class="dt-label">שעות שליחה:</td><td>${hoursDisplay} (שעון ישראל)</td></tr>
+              <tr><td class="dt-label">תדירות:</td><td>${escapeHtml(freqDisplay)}</td></tr>
+              <tr><td class="dt-label">ימים אחורה:</td><td>${acc.daysBack || 30}</td></tr>
+              <tr><td class="dt-label">Secret משתמש:</td><td><code>${escapeHtml(acc.userSecret)}</code></td></tr>
+              <tr><td class="dt-label">Secret סיסמה:</td><td><code>${escapeHtml(acc.passSecret)}</code></td></tr>
+            </table>
           </div>
         </div>
         <div class="actions">
+          <button data-id="${escapeHtml(acc.id)}" class="view-details">פרטים</button>
           <button data-id="${escapeHtml(acc.id)}" class="run-now">הרץ עכשיו</button>
           <button data-id="${escapeHtml(acc.id)}" class="edit-acc secondary">ערוך</button>
           <button data-id="${escapeHtml(acc.id)}" class="toggle secondary">${acc.enabled === false ? 'הפעל' : 'השבת'}</button>
@@ -162,6 +178,14 @@ async function refreshAccounts() {
         </div>
       `;
       list.appendChild(row);
+    });
+    list.querySelectorAll('.view-details').forEach(b => b.onclick = () => {
+      const el = document.getElementById('details-' + b.dataset.id);
+      if (el) {
+        const showing = el.style.display !== 'none';
+        el.style.display = showing ? 'none' : '';
+        b.textContent = showing ? 'פרטים' : 'הסתר';
+      }
     });
     list.querySelectorAll('.run-now').forEach(b => b.onclick = () => runAccount(b.dataset.id));
     list.querySelectorAll('.edit-acc').forEach(b => b.onclick = () => editAccount(b.dataset.id));
