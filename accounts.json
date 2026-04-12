@@ -5,11 +5,29 @@
       "label": "פאג״י 184993",
       "companyId": "pagi",
       "email": "t.marchum@gmail.com",
-      "hours": [13, 1],
+      "hours": [
+        13,
+        1
+      ],
       "frequency": "daily",
       "daysBack": 30,
       "userSecret": "BANK_USER_PAGI_184993",
       "passSecret": "BANK_PASS_PAGI_184993",
+      "enabled": true
+    },
+    {
+      "id": "vaadmeshorer18",
+      "label": "חשבון ועד משורר 18",
+      "companyId": "pagi",
+      "email": "t.marchum@gmail.com",
+      "hours": [
+        13,
+        1
+      ],
+      "frequency": "daily",
+      "daysBack": 30,
+      "userSecret": "BANK_USER_VAADMESHORER18",
+      "passSecret": "BANK_PASS_VAADMESHORER18",
       "enabled": true
     }
   ]
