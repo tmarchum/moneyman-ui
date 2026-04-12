@@ -1,16 +1,6 @@
 // Moneyman UI - GitHub-backed multi-account scraper manager
 
-import _sodiumModule from 'https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.15/+esm';
-
 const LS_KEY = 'moneyman-ui-auth';
-let sodium = null;
-
-async function sodium_ready() {
-  if (sodium) return;
-  await _sodiumModule.ready;
-  sodium = _sodiumModule;
-}
-sodium_ready();
 
 function getAuth() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
@@ -78,12 +68,39 @@ function setStatus(id, msg, ok) {
   el.className = `status ${ok ? 'ok' : 'err'}`;
 }
 
-async function encryptSecret(publicKeyB64, value) {
-  if (!sodium) await sodium_ready();
-  const msgBytes = sodium.from_string(value);
-  const keyBytes = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
-  const enc = sodium.crypto_box_seal(msgBytes, keyBytes);
-  return sodium.to_base64(enc, sodium.base64_variants.ORIGINAL);
+// Sealed box encryption using tweetnacl (compatible with libsodium crypto_box_seal)
+function encryptSecret(publicKeyB64, value) {
+  const publicKey = base64ToUint8Array(publicKeyB64);
+  const msgBytes = nacl.util.decodeUTF8(value);
+  // Generate ephemeral keypair
+  const ephemeralKeypair = nacl.box.keyPair();
+  // Compute nonce from ephemeral_pk + recipient_pk (first 24 bytes of blake2b/sha512)
+  const nonceInput = new Uint8Array(64);
+  nonceInput.set(ephemeralKeypair.publicKey, 0);
+  nonceInput.set(publicKey, 32);
+  // Use sha512 and take first 24 bytes as nonce (GitHub-compatible sealed box)
+  return crypto.subtle.digest('SHA-512', nonceInput).then(hash => {
+    const nonce = new Uint8Array(hash).slice(0, 24);
+    const encrypted = nacl.box(msgBytes, nonce, publicKey, ephemeralKeypair.secretKey);
+    // Sealed box = ephemeral_pk (32) + encrypted
+    const sealed = new Uint8Array(32 + encrypted.length);
+    sealed.set(ephemeralKeypair.publicKey, 0);
+    sealed.set(encrypted, 32);
+    return uint8ArrayToBase64(sealed);
+  });
+}
+
+function base64ToUint8Array(b64) {
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function uint8ArrayToBase64(arr) {
+  let binary = '';
+  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
+  return btoa(binary);
 }
 
 async function setSecret(name, value) {
