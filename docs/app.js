@@ -68,26 +68,23 @@ function setStatus(id, msg, ok) {
   el.className = `status ${ok ? 'ok' : 'err'}`;
 }
 
-// Sealed box encryption using tweetnacl (compatible with libsodium crypto_box_seal)
+// Sealed box encryption using tweetnacl + blakejs (compatible with libsodium crypto_box_seal)
 function encryptSecret(publicKeyB64, value) {
   const publicKey = base64ToUint8Array(publicKeyB64);
   const msgBytes = nacl.util.decodeUTF8(value);
   // Generate ephemeral keypair
   const ephemeralKeypair = nacl.box.keyPair();
-  // Compute nonce from ephemeral_pk + recipient_pk (first 24 bytes of blake2b/sha512)
+  // Compute nonce: BLAKE2b(ephemeral_pk || recipient_pk, 24 bytes)
   const nonceInput = new Uint8Array(64);
   nonceInput.set(ephemeralKeypair.publicKey, 0);
   nonceInput.set(publicKey, 32);
-  // Use sha512 and take first 24 bytes as nonce (GitHub-compatible sealed box)
-  return crypto.subtle.digest('SHA-512', nonceInput).then(hash => {
-    const nonce = new Uint8Array(hash).slice(0, 24);
-    const encrypted = nacl.box(msgBytes, nonce, publicKey, ephemeralKeypair.secretKey);
-    // Sealed box = ephemeral_pk (32) + encrypted
-    const sealed = new Uint8Array(32 + encrypted.length);
-    sealed.set(ephemeralKeypair.publicKey, 0);
-    sealed.set(encrypted, 32);
-    return uint8ArrayToBase64(sealed);
-  });
+  const nonce = blakejs.blake2b(nonceInput, null, 24);
+  const encrypted = nacl.box(msgBytes, nonce, publicKey, ephemeralKeypair.secretKey);
+  // Sealed box = ephemeral_pk (32) + encrypted
+  const sealed = new Uint8Array(32 + encrypted.length);
+  sealed.set(ephemeralKeypair.publicKey, 0);
+  sealed.set(encrypted, 32);
+  return Promise.resolve(uint8ArrayToBase64(sealed));
 }
 
 function base64ToUint8Array(b64) {
