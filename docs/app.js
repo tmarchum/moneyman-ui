@@ -6,10 +6,17 @@ let sodium = null;
 function sodium_ready() {
   return new Promise(resolve => {
     const check = () => {
-      if (window.sodium) {
+      if (window._sodium) {
+        window._sodium.ready.then(() => {
+          sodium = window._sodium;
+          resolve();
+        });
+      } else if (window.sodium && window.sodium.crypto_box_seal) {
         sodium = window.sodium;
         resolve();
-      } else setTimeout(check, 50);
+      } else {
+        setTimeout(check, 100);
+      }
     };
     check();
   });
