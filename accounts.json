@@ -13,7 +13,8 @@
       "daysBack": 30,
       "userSecret": "BANK_USER_PAGI_184993",
       "passSecret": "BANK_PASS_PAGI_184993",
-      "enabled": true
+      "enabled": true,
+      "synagogue_id": "69b5e8a0578b305c583d480c"
     },
     {
       "id": "vaadmeshorer18",
