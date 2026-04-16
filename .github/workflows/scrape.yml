@@ -92,7 +92,10 @@ jobs:
           ACCT_DAYS: ${{ matrix.account.daysBack }}
           BANK_USER: ${{ steps.creds.outputs.user }}
           BANK_PASS: ${{ steps.creds.outputs.pass }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
         run: |
+          # Base config
           CONFIG=$(jq -nc \
             --arg company "$ACCT_COMPANY" \
             --arg user "$BANK_USER" \
@@ -103,6 +106,11 @@ jobs:
                storage: { localJson: { enabled: true, path: "/output" } },
                options: { scraping: { daysBack: $days, futureMonths: 1, transactionHashType: "moneyman" }, scraperMaxParallelism: 1 }
              }')
+          # Add webPost webhook if configured
+          if [ -n "$WEBHOOK_URL" ]; then
+            CONFIG=$(echo "$CONFIG" | jq --arg url "$WEBHOOK_URL" --arg token "${WEBHOOK_TOKEN:-}" \
+              '.storage.webPost = { url: $url, authorizationToken: $token }')
+          fi
           echo "::add-mask::$CONFIG"
           echo "$CONFIG" > "$RUNNER_TEMP/moneyman.cfg.json"
 
