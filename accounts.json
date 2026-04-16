@@ -2,7 +2,7 @@
   "accounts": [
     {
       "id": "pagi-184993",
-      "label": "×¤×××´× 184993",
+      "label": "ÃÂ¤ÃÂÃÂÃÂ´ÃÂ 184993",
       "companyId": "pagi",
       "email": "t.marchum@gmail.com",
       "hours": [
@@ -13,11 +13,11 @@
       "daysBack": 30,
       "userSecret": "BANK_USER_PAGI_184993",
       "passSecret": "BANK_PASS_PAGI_184993",
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "vaadmeshorer18",
-      "label": "××©××× ××¢× ××©××¨×¨ 18",
+      "label": "ÃÂÃÂ©ÃÂÃÂÃÂ ÃÂÃÂ¢ÃÂ ÃÂÃÂ©ÃÂÃÂ¨ÃÂ¨ 18",
       "companyId": "pagi",
       "email": "t.marchum@gmail.com",
       "hours": [
