@@ -68,37 +68,8 @@ function setStatus(id, msg, ok) {
   el.className = `status ${ok ? 'ok' : 'err'}`;
 }
 
-// Minimal BLAKE2b (24-byte output only, for sealed box nonce)
-const BLAKE2B_IV = new Uint32Array([
-  0xF3BCC908,0x6A09E667,0x84CAA73B,0xBB67AE85,0xFE94F82B,0x3C6EF372,0x5F1D36F1,0xA54FF53A,
-  0xADE682D1,0x510E527F,0x2B3E6C1F,0x9B05688C,0xFB41BD6B,0x1F83D9AB,0x137E2179,0x5BE0CD19
-]);
-const SIGMA = [
-  [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[14,10,4,8,9,15,13,6,1,12,0,2,11,7,5,3],
-  [11,8,12,0,5,2,15,13,10,14,3,6,7,1,9,4],[7,9,3,1,13,12,11,14,2,6,5,10,4,0,15,8],
-  [9,0,5,7,2,4,10,15,14,1,11,12,6,8,3,13],[2,12,6,10,0,11,8,3,4,13,7,5,15,14,1,9],
-  [12,5,1,15,14,13,4,10,0,7,6,3,9,2,8,11],[13,11,7,14,12,1,3,9,5,0,15,4,8,6,2,10],
-  [6,15,14,9,11,3,0,8,12,2,13,7,1,4,10,5],[10,2,8,4,7,6,1,5,15,11,9,14,3,12,13,0],
-  [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[14,10,4,8,9,15,13,6,1,12,0,2,11,7,5,3]
-];
-function ADD64(v,a,b){const o0=v[a]+v[b];const o1=v[a+1]+v[b+1];if(o0>=0x100000000)v[a+1]=o1+1;else v[a+1]=o1;v[a]=o0}
-function B2B_G(v,a,b,c,d,ix,iy){ADD64(v,a,b);v[a]+=ix;if(v[a]<ix)v[a+1]++;v[d]^=v[a];v[d+1]^=v[a+1];let xh=v[d]>>>16|v[d+1]<<16;let xl=v[d+1]>>>16|v[d]<<16;v[d]=xh;v[d+1]=xl;ADD64(v,c,d);v[b]^=v[c];v[b+1]^=v[c+1];xh=v[b]>>>24|v[b+1]<<8;xl=v[b+1]>>>24|v[b]<<8;v[b]=xh;v[b+1]=xl;ADD64(v,a,b);v[a]+=iy;if(v[a]<iy)v[a+1]++;v[d]^=v[a];v[d+1]^=v[a+1];xh=v[d+1]>>>16|v[d]<<16;xl=v[d]>>>16|v[d+1]<<16;v[d]=xh;v[d+1]=xl;ADD64(v,c,d);v[b]^=v[c];v[b+1]^=v[c+1];xh=v[b+1]>>>1|v[b]<<31;xl=v[b]>>>1|v[b+1]<<31;v[b]=xh;v[b+1]=xl}
-function blake2b(input,outlen){
-  const h=new Uint32Array(BLAKE2B_IV);h[0]^=0x01010000^outlen;
-  const c=new Uint32Array(2);const b=new Uint8Array(128);let p=0;
-  function compress(last){
-    const v=new Uint32Array(32);for(let i=0;i<16;i++)v[i]=h[i];for(let i=0;i<16;i++)v[i+16]=BLAKE2B_IV[i];
-    v[24]^=c[0];v[25]^=c[1];if(last){v[28]=~v[28];v[29]=~v[29]}
-    const m=new Uint32Array(32);for(let i=0;i<32;i++)m[i]=b[i*4]|(b[i*4+1]<<8)|(b[i*4+2]<<16)|(b[i*4+3]<<24);
-    for(let i=0;i<12;i++){const s=SIGMA[i];B2B_G(v,0,8,16,24,m[s[0]*2],m[s[0]*2+1]);B2B_G(v,2,10,18,26,m[s[1]*2],m[s[1]*2+1]);B2B_G(v,4,12,20,28,m[s[2]*2],m[s[2]*2+1]);B2B_G(v,6,14,22,30,m[s[3]*2],m[s[3]*2+1]);B2B_G(v,0,10,20,30,m[s[4]*2],m[s[4]*2+1]);B2B_G(v,2,12,22,24,m[s[5]*2],m[s[5]*2+1]);B2B_G(v,4,14,16,26,m[s[6]*2],m[s[6]*2+1]);B2B_G(v,6,8,18,28,m[s[7]*2],m[s[7]*2+1])}
-    for(let i=0;i<16;i++)h[i]^=v[i]^v[i+16];
-  }
-  for(let i=0;i<input.length;i++){if(p===128){c[0]+=128;if(c[0]<128)c[1]++;compress(false);p=0}b[p++]=input[i]}
-  c[0]+=p;if(c[0]<p)c[1]++;while(p<128)b[p++]=0;compress(true);
-  const out=new Uint8Array(outlen);for(let i=0;i<outlen;i++)out[i]=(h[i>>2]>>((i&3)*8))&0xFF;return out;
-}
-
 // Sealed box encryption using tweetnacl + BLAKE2b (compatible with libsodium crypto_box_seal)
+// blake2b.js must be loaded first — exposes window.blakejs.blake2b
 function encryptSecret(publicKeyB64, value) {
   const publicKey = base64ToUint8Array(publicKeyB64);
   const msgBytes = nacl.util.decodeUTF8(value);
@@ -107,7 +78,7 @@ function encryptSecret(publicKeyB64, value) {
   const nonceInput = new Uint8Array(64);
   nonceInput.set(ephemeralKeypair.publicKey, 0);
   nonceInput.set(publicKey, 32);
-  const nonce = blake2b(nonceInput, 24);
+  const nonce = blakejs.blake2b(nonceInput, null, 24);
   const encrypted = nacl.box(msgBytes, nonce, publicKey, ephemeralKeypair.secretKey);
   const sealed = new Uint8Array(32 + encrypted.length);
   sealed.set(ephemeralKeypair.publicKey, 0);
