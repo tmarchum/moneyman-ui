@@ -29,7 +29,8 @@
       "daysBack": 30,
       "userSecret": "BANK_USER_VAADMESHORER18",
       "passSecret": "BANK_PASS_VAADMESHORER18",
-      "enabled": true
+      "enabled": true,
+      "synagogue_id": "69df7bfda6a3cb0d54815f7c"
     }
   ]
 }
