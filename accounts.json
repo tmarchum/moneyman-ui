@@ -1,36 +1,34 @@
 {
-  "accounts": [
-    {
-      "id": "pagi-184993",
-      "label": "פאג״י 184993",
-      "companyId": "pagi",
-      "email": "t.marchum@gmail.com",
-      "hours": [
-        13,
-        1
-      ],
-      "frequency": "daily",
-      "daysBack": 30,
-      "userSecret": "BANK_USER_PAGI_184993",
-      "passSecret": "BANK_PASS_PAGI_184993",
-      "enabled": true,
-      "synagogue_id": "69b5e8a0578b305c583d480c"
-    },
-    {
-      "id": "vaadmeshorer18",
-      "label": "חשבון ועד משורר 18",
-      "companyId": "pagi",
-      "email": "t.marchum@gmail.com",
-      "hours": [
-        13,
-        1
-      ],
-      "frequency": "daily",
-      "daysBack": 30,
-      "userSecret": "BANK_USER_VAADMESHORER18",
-      "passSecret": "BANK_PASS_VAADMESHORER18",
-      "enabled": true,
-      "synagogue_id": "69df7bfda6a3cb0d54815f7c"
-    }
-  ]
+    "accounts": [
+          {
+                  "id": "pagi-184993",
+                  "label": "פאג״י 184993",
+                  "companyId": "pagi",
+                  "email": "t.marchum@gmail.com",
+                  "hours": [
+                            13
+                  ],
+                  "frequency": "daily",
+                  "daysBack": 30,
+                  "userSecret": "BANK_USER_PAGI_184993",
+                  "passSecret": "BANK_PASS_PAGI_184993",
+                  "enabled": true,
+                  "synagogue_id": "69b5e8a0578b305c583d480c"
+          },
+          {
+                  "id": "vaadmeshorer18",
+                  "label": "חשבון ועד משורר 18",
+                  "companyId": "pagi",
+                  "email": "t.marchum@gmail.com",
+                  "hours": [
+                            13
+                  ],
+                  "frequency": "daily",
+                  "daysBack": 30,
+                  "userSecret": "BANK_USER_VAADMESHORER18",
+                  "passSecret": "BANK_PASS_VAADMESHORER18",
+                  "enabled": true,
+                  "synagogue_id": "69df7bfda6a3cb0d54815f7c"
+          }
+    ]
 }
