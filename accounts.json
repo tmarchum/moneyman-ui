@@ -6,7 +6,8 @@
                   "companyId": "pagi",
                   "email": "t.marchum@gmail.com",
                   "hours": [
-                            13
+                            13,
+                      1
                   ],
                   "frequency": "daily",
                   "daysBack": 30,
@@ -21,7 +22,8 @@
                   "companyId": "pagi",
                   "email": "t.marchum@gmail.com",
                   "hours": [
-                            13
+                            13,
+                      1
                   ],
                   "frequency": "daily",
                   "daysBack": 30,
